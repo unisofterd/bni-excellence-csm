@@ -68,13 +68,32 @@ role.items.forEach(item=>{let l=document.createElement("label");l.className="che
 sel.addEventListener("change",drawChecks);drawChecks();
 function msg(t){$("result").textContent=t;$("result").style.display="block"}
 $("saveBtn").onclick=async()=>{
- if(!sb){msg("Please configure the Supabase Project URL and anon/publishable key first.");return}
- const role=ROLE_DATA.find(r=>r.name===sel.value);
- const payload={role_name:role.name,role_group:role.group,report_month:$("month").value?$("month").value+"-01":null,submitted_by:$("submitter").value,checklist:role.items.map((item,i)=>({item,checked:$("checks").querySelectorAll("input")[i].checked})),achievements:$("achievements").value,gaps:$("gaps").value,next_month_target:$("target").value,action_owner_deadline:$("actionsText").value,evidence_remarks:$("evidence").value};
- const {error}=await sb.from("csm_reports").insert(payload);
- if(error){msg("Submission failed: "+error.message);return}
- msg("Report submitted successfully to the shared Supabase database.");
- await loadReports();
+ if(!sb){msg("NOT SAVED: Supabase is not configured. Please check the Project URL and publishable key.");return}
+ const button=$("saveBtn");
+ button.disabled=true;
+ button.textContent="Saving...";
+ $("result").style.display="none";
+ try {
+   const role=ROLE_DATA.find(r=>r.name===sel.value);
+   const payload={role_name:role.name,role_group:role.group,report_month:$("month").value?$("month").value+"-01":null,submitted_by:$("submitter").value,checklist:role.items.map((item,i)=>({item,checked:$("checks").querySelectorAll("input")[i].checked})),achievements:$("achievements").value,gaps:$("gaps").value,next_month_target:$("target").value,action_owner_deadline:$("actionsText").value,evidence_remarks:$("evidence").value};
+   const {data,error}=await sb.from("csm_reports").insert(payload).select("id").single();
+   if(error) {
+     msg("❌ NOT SAVED. Supabase returned an error: "+error.message);
+     return;
+   }
+   $("result").textContent="✅ SUCCESSFULLY SAVED! Your "+role.name+" report has been stored in the BNI Excellence central database.";
+   $("result").style.display="block";
+   $("result").style.background="#e8f7ee";
+   $("result").style.borderLeftColor="#24734f";
+   $("result").style.color="#14532d";
+   alert("SUCCESSFULLY SAVED! Your CSM report is stored in Supabase.");
+   await loadReports();
+ } catch(e) {
+   msg("❌ NOT SAVED. Connection error: "+(e.message||String(e)));
+ } finally {
+   button.disabled=false;
+   button.textContent="Submit report";
+ }
 };
 $("printBtn").onclick=()=>window.print();
 $("clearBtn").onclick=()=>{document.querySelectorAll("#checks input").forEach(x=>x.checked=false);["month","submitter","achievements","gaps","target","actionsText","evidence"].forEach(id=>$(id).value="");$("result").style.display="none"};
