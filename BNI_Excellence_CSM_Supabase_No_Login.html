@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BNI Excellence – CSM Report Portal</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--navy:#14283f;--red:#b51f2b;--ink:#243447;--muted:#657386;--line:#dce3eb;--bg:#f3f6fa;--green:#24734f}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:15px/1.5 Arial,sans-serif;color:var(--ink)}
+header{background:linear-gradient(120deg,#10243a,#203d5b);color:white;padding:24px 18px}
+.wrap{max-width:1100px;margin:auto}h1{margin:0 0 4px;font-size:25px}header p{margin:0;color:#dce6f1}
+main{max-width:1100px;margin:20px auto;padding:0 15px;display:grid;grid-template-columns:290px 1fr;gap:17px}
+.panel,.content{background:white;border:1px solid var(--line);border-radius:13px;box-shadow:0 5px 18px #162c4410}
+.panel{padding:17px;height:max-content}.content{padding:21px;min-height:540px}
+label{display:block;font-weight:700;margin:0 0 6px}input,select,textarea{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;margin-bottom:12px}
+button{border:0;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer}.primary{background:var(--red);color:white}.secondary{background:#e8edf3;color:var(--navy)}
+.muted{color:var(--muted);font-size:13px}.role-title{font-size:22px;color:var(--navy);margin:0}
+.check{display:flex;gap:9px;padding:9px 0;border-bottom:1px solid #edf0f4;font-weight:400}.check input{width:18px;margin:2px 0;flex:none;accent-color:var(--green)}
+.section{font-weight:700;color:var(--navy);margin:17px 0 8px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}.notice{padding:10px 12px;background:#f5f8fc;border-left:3px solid var(--red);font-size:13px;margin:10px 0}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{border-bottom:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}th{color:var(--navy)}
+@media(max-width:760px){main{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.content{padding:16px}}
+@media print{.panel,.actions,header .muted{display:none}main{display:block}.content{border:0;box-shadow:none}}
+</style></head>
+<body>
+<header><div class="wrap"><h1>BNI EXCELLENCE – ERODE</h1><p>Chapter Success Meeting | Coordinator & MC Report Portal</p></div></header>
+<main>
+<aside class="panel">
+<b>CSM reporting portal</b>
+<p class="muted">No login required. Select your role, complete the checklist and submit your monthly report.</p>
+<label for="month">Reporting month</label><input id="month" type="month">
+<label for="submitter">Coordinator / MC name</label><input id="submitter" placeholder="Enter your name">
+<div class="notice"><b>Privacy notice:</b> This is a public no-login portal. Anyone who can access the page may submit a report and view the shared submission dashboard. Do not enter confidential member details or sensitive personal information.</div>
+<button class="secondary" id="refreshBtn">Refresh all submissions</button>
+</aside>
+<section class="content">
+<div class="muted" id="connectionState">Checking database connection…</div>
+<div class="section">Choose report role</div>
+<label for="roleSelect">Coordinator / MC role</label><select id="roleSelect"></select>
+<h2 class="role-title" id="roleTitle"></h2>
+<p class="muted">Tick each item after checking the report or evidence.</p>
+<div id="checks"></div>
+<div class="section">Monthly report summary</div>
+<label>Achievements / actual results</label><textarea id="achievements" rows="3" placeholder="Enter figures, outcomes and highlights…"></textarea>
+<label>Pending items / challenges</label><textarea id="gaps" rows="3" placeholder="What is pending? What support is needed?"></textarea>
+<div class="grid"><div><label>Next month target</label><textarea id="target" rows="3"></textarea></div>
+<div><label>Action owner & deadline</label><textarea id="actionsText" rows="3"></textarea></div></div>
+<label>Evidence / report link / remarks</label><textarea id="evidence" rows="2"></textarea>
+<div class="actions"><button class="primary" id="saveBtn">Submit report</button><button class="secondary" id="printBtn">Print / Save PDF</button><button class="secondary" id="clearBtn">Clear form</button></div>
+<div id="result" class="notice" style="display:none"></div>
+<div class="section">All submitted CSM reports</div><div id="reportTable" class="muted">Loading reports…</div>
+</section></main>
+<script>
+/* Replace these with Supabase Project Settings > API values.
+   Use the anon / publishable key only. Never use service_role or secret keys here. */
+const SUPABASE_URL = "cgfrmzbbjrgssvrlalpv";
+const SUPABASE_ANON_KEY = "sb_publishable_EkfoRtwK04uZPxDAB42kgg_8BlzNGHA";
+const ROLE_DATA = [{"group": "Coordinators", "name": "Education Coordinator", "items": ["Monthly education sessions conducted (topic, date, presenter)", "Attendance and member participation", "Member education needs and feedback", "Next month’s education calendar and presenters", "Learning materials shared and follow-up completed"]}, {"group": "Coordinators", "name": "Visitor Host Coordinator", "items": ["Visitor names, business categories and visit dates", "Invited-by member and attendance status", "Visitor welcome / host assignment completed", "Follow-up status and second-visit invitations", "Applications / conversion pipeline and pending follow-ups"]}, {"group": "Coordinators", "name": "Mentor Coordinator", "items": ["New-member mentor assignments", "Passport to Success progress for eligible members", "Orientation, training and one-to-one progress", "Overdue milestones and members needing support", "Mentor actions and next milestone dates"]}, {"group": "Coordinators", "name": "Event Coordinator", "items": ["Events conducted, purpose, date and attendance", "Event budget, actual expenses and collections (if applicable)", "Feedback and lessons learned", "Upcoming event calendar and approvals", "Task owners, deadlines and resources required"]}, {"group": "Coordinators", "name": "Growth Coordinator", "items": ["Growth campaigns conducted", "Priority business categories identified", "Visitor leads, invitations and visits generated", "Member participation and campaign gaps", "Next campaign target, date and owners"]}, {"group": "Coordinators", "name": "Go-Green Coordinator", "items": ["Green activities conducted and dates", "Member / Power Team participation", "Measurable outcomes (e.g. trees planted, waste reduced)", "Green practices at meetings and events", "Next activity, target and volunteers"]}, {"group": "Coordinators", "name": "Venue Coordinator", "items": ["Venue booking and meeting-date confirmation", "Seating, layout, cleanliness and visitor access", "Audio, microphone, projector, screen, power and internet readiness", "Venue issues and corrective actions", "Venue charges / invoices and upcoming requirements"]}, {"group": "Coordinators", "name": "Social Coordinator", "items": ["Social events and celebrations conducted", "Participation and attendance", "Member engagement / bonding activities", "Feedback and upcoming social calendar", "Budget and volunteers required (if applicable)"]}, {"group": "Coordinators", "name": "Social-Media Coordinator", "items": ["Posts, reels, stories and promotions published", "Chapter achievements, member spotlights and event coverage", "Reach, views, engagement, shares and follower change", "Pending content, approvals and member promotions", "Next month’s content calendar and targets"]}, {"group": "Coordinators", "name": "1-2-1 Coordinator", "items": ["Number of 1-2-1s recorded this month", "Members completing 1-2-1s and members with zero activity", "1-2-1 quality / G.A.I.N.S. preparation support", "Workshops, reminders or pairing initiatives conducted", "Next month’s participation target and follow-up plan"]}, {"group": "Coordinators", "name": "Training Coordinator", "items": ["Training sessions conducted (topic, date, trainer)", "Attendance and completion status", "New-member training coordination", "Training needs and feedback", "Next month’s training calendar and follow-up"]}, {"group": "Coordinators", "name": "Success Coordinator", "items": ["Verified member achievements / milestones", "Success stories and testimonials with member approval", "Members needing coaching or recognition", "Recognition completed / proposed", "Next month’s success focus and actions"]}, {"group": "Coordinators", "name": "Weekly Presentation Coordinator", "items": ["Weekly presenter roster and confirmation status", "Presentations completed / rescheduled", "Preparation and coaching support provided", "Presentation quality / timing feedback", "Upcoming roster and backup presenter plan"]}, {"group": "Coordinators", "name": "BNI Connect Coordinator", "items": ["Member login / access issues and resolution", "Profile and business information update status", "Referrals, TYFCB, 1-2-1 and visitor entry guidance", "Missing / incorrect data issues", "Pre-CSM reports and support sessions completed"]}, {"group": "Membership Committee (MC)", "name": "Community Building Specialist", "items": ["Opening member count, new members, dropped members and closing count", "Net membership growth and retention status", "At-risk members and support actions", "Reasons for exits where known and appropriate", "Next month’s retention / community-building plan"]}, {"group": "Membership Committee (MC)", "name": "Quality Assurance Specialist", "items": ["Meeting quality and standards observations", "Attendance / participation concerns requiring review", "Policy or process issues and status", "Complaints / sensitive matters appropriately escalated", "Corrective actions, owners and deadlines"]}, {"group": "Membership Committee (MC)", "name": "Member Engagement Specialist", "items": ["Seven-month reviews due, completed and pending", "Renewals due in the next two months and follow-up status", "Members with low engagement needing support", "Review outcomes and agreed actions", "Renewal risks and next steps"]}, {"group": "Membership Committee (MC)", "name": "Member Relations Specialist", "items": ["Member concerns received (confidential summary only)", "Status: received, discussion, action, resolved or escalated", "Relationship / communication support provided", "Follow-up dates and open matters", "Recurring themes and improvement recommendations"]}, {"group": "Membership Committee (MC)", "name": "MC Lead / Consolidated Report", "items": ["Specialist reports received and consolidated", "Membership movement and net growth summary", "Retention / renewal risks and member support plan", "Seven-month reviews and new-member support status", "Top three MC priorities, decisions required and action owners"]}];
+const $ = id => document.getElementById(id);
+let sb = null;
+const configured = SUPABASE_URL.startsWith("https://") && !SUPABASE_URL.includes("PASTE_") && !SUPABASE_ANON_KEY.includes("PASTE_");
+if(configured && window.supabase){sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);$("connectionState").textContent="Supabase connection configured";}
+else $("connectionState").textContent="Supabase setup required — add your Project URL and anon/publishable key in this file.";
+
+const sel=$("roleSelect");
+[...new Set(ROLE_DATA.map(r=>r.group))].forEach(group=>{let og=document.createElement("optgroup");og.label=group;ROLE_DATA.filter(r=>r.group===group).forEach(r=>{let o=document.createElement("option");o.value=r.name;o.textContent=r.name;og.appendChild(o)});sel.appendChild(og)});
+function drawChecks(){let role=ROLE_DATA.find(r=>r.name===sel.value);$("roleTitle").textContent=role.name;$("checks").innerHTML="";
+role.items.forEach(item=>{let l=document.createElement("label");l.className="check";let c=document.createElement("input");c.type="checkbox";let s=document.createElement("span");s.textContent=item;l.append(c,s);$("checks").append(l)})}
+sel.addEventListener("change",drawChecks);drawChecks();
+function msg(t){$("result").textContent=t;$("result").style.display="block"}
+$("saveBtn").onclick=async()=>{
+ if(!sb){msg("Please configure the Supabase Project URL and anon/publishable key first.");return}
+ const role=ROLE_DATA.find(r=>r.name===sel.value);
+ const payload={role_name:role.name,role_group:role.group,report_month:$("month").value?$("month").value+"-01":null,submitted_by:$("submitter").value,checklist:role.items.map((item,i)=>({item,checked:$("checks").querySelectorAll("input")[i].checked})),achievements:$("achievements").value,gaps:$("gaps").value,next_month_target:$("target").value,action_owner_deadline:$("actionsText").value,evidence_remarks:$("evidence").value};
+ const {error}=await sb.from("csm_reports").insert(payload);
+ if(error){msg("Submission failed: "+error.message);return}
+ msg("Report submitted successfully to the shared Supabase database.");
+ await loadReports();
+};
+$("printBtn").onclick=()=>window.print();
+$("clearBtn").onclick=()=>{document.querySelectorAll("#checks input").forEach(x=>x.checked=false);["month","submitter","achievements","gaps","target","actionsText","evidence"].forEach(id=>$(id).value="");$("result").style.display="none"};
+$("refreshBtn").onclick=loadReports;
+async function loadReports(){
+ if(!sb){$("reportTable").textContent="Reports will appear here after Supabase is configured.";return}
+ const {data,error}=await sb.from("csm_reports").select("role_name,role_group,report_month,submitted_by,created_at,checklist,achievements,gaps,next_month_target,action_owner_deadline,evidence_remarks").order("created_at",{ascending:false}).limit(300);
+ if(error){$("reportTable").textContent="Could not load reports: "+error.message;return}
+ if(!data.length){$("reportTable").textContent="No reports submitted yet.";return}
+ let table=document.createElement("table"),head=document.createElement("tr");
+ ["Role","Month","Submitted by","Checklist","Achievements / notes","Submitted"].forEach(x=>{let th=document.createElement("th");th.textContent=x;head.append(th)});table.append(head);
+ data.forEach(r=>{let tr=document.createElement("tr");let checked=(r.checklist||[]).filter(x=>x.checked).length, total=(r.checklist||[]).length;
+ let vals=[r.role_name,r.report_month||"",r.submitted_by||"",`${checked}/${total} checked`,[r.achievements,r.gaps,r.next_month_target,r.action_owner_deadline,r.evidence_remarks].filter(Boolean).join(" | "),new Date(r.created_at).toLocaleString()];
+ vals.forEach(v=>{let td=document.createElement("td");td.textContent=v;tr.append(td)});table.append(tr)});
+ $("reportTable").innerHTML="";$("reportTable").append(table);
+}
+if(sb)loadReports();
+</script></body></html>
